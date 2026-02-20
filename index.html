@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perler Bead Studio</title>
+<meta name="description" content="Convert any image into a printable Perler bead pattern PDF">
+<meta name="theme-color" content="#0e0e0e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Perler Studio">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.svg">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,700;1,300&display=swap');
+
+  :root {
+    --bg: #0e0e0e;
+    --surface: #181818;
+    --border: #2a2a2a;
+    --accent: #e8c547;
+    --accent2: #c96b3f;
+    --text: #f0ece2;
+    --muted: #777;
+    --bead-size: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.4;
+  }
+
+  header {
+    padding: 2.5rem 3rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 1.5rem;
+  }
+
+  header h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  header h1 span {
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  header p {
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: calc(100vh - 80px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.8rem;
+    background: var(--surface);
+  }
+
+  .section-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+
+  /* Upload area */
+  .upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 4px;
+    padding: 2rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-zone:hover, .upload-zone.drag {
+    border-color: var(--accent);
+    background: rgba(232,197,71,0.04);
+  }
+
+  .upload-zone input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+
+  .upload-zone p {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .upload-zone strong {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* Controls */
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .control-group label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .control-group label span {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+
+  input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+  }
+
+  select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    border-radius: 3px;
+    cursor: pointer;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  select:focus { border-color: var(--accent); }
+
+  /* Color palette display */
+  .palette-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-height: 28px;
+  }
+
+  .palette-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.08);
+    transition: transform 0.15s;
+  }
+
+  .palette-swatch:hover { transform: scale(1.25); }
+
+  /* Buttons */
+  .btn {
+    padding: 0.65rem 1.2rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    border: none;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    font-weight: 500;
+  }
+
+  .btn-primary:hover { background: #f0d060; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-secondary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .btn-row .btn { flex: 1; }
+
+  /* Stats */
+  .stats {
+    font-size: 0.7rem;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .stats .stat {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .stats .stat span:last-child { color: var(--text); }
+
+  /* MAIN CANVAS AREA */
+  .main {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    overflow: auto;
+  }
+
+  .canvas-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .canvas-header h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 1.1rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .zoom-controls {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .zoom-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    border-radius: 3px;
+    transition: border-color 0.15s;
+    font-family: monospace;
+  }
+
+  .zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .zoom-level {
+    font-size: 0.7rem;
+    color: var(--muted);
+    min-width: 36px;
+    text-align: center;
+  }
+
+  /* Bead canvas wrapper */
+  .bead-viewport {
+    overflow: auto;
+    background: repeating-conic-gradient(#1a1a1a 0% 25%, #141414 0% 50%) 0 0 / 20px 20px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    flex: 1;
+    min-height: 400px;
+    position: relative;
+  }
+
+  #beadCanvas {
+    display: block;
+    cursor: crosshair;
+    image-rendering: pixelated;
+  }
+
+  .empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    pointer-events: none;
+  }
+
+  .empty-state .big-icon {
+    font-size: 4rem;
+    opacity: 0.15;
+  }
+
+  .empty-state p {
+    color: var(--muted);
+    font-size: 0.8rem;
+    opacity: 0.5;
+  }
+
+  /* Color legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.65rem;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.25rem 0.5rem;
+    border-radius: 2px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: var(--accent);
+    color: #000;
+    padding: 0.75rem 1.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Progress overlay */
+  .progress-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .progress-overlay.show { display: flex; }
+
+  .progress-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 2rem 3rem;
+    text-align: center;
+    border-radius: 4px;
+  }
+
+  .progress-bar-track {
+    width: 220px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 1rem;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.15s;
+    width: 0%;
+  }
+
+  .progress-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+  }
+
+  /* Separator */
+  .sep {
+    height: 1px;
+    background: var(--border);
+    margin: 0 -2rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Perler <span>Bead</span> Studio</h1>
+  </div>
+  <p>image → printable pattern</p>
+  <button id="installBtn" class="btn btn-secondary" style="display:none;margin-left:auto;align-items:center;gap:0.4rem;">
+    ⬇ Install App
+  </button>
+</header>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div>
+      <div class="section-label">01 — Upload Image</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept="image/jpeg,image/png">
+        <span class="upload-icon">⬡</span>
+        <p><strong>Click or drag</strong> a JPG or PNG</p>
+        <p style="margin-top:0.3rem;font-size:0.65rem;">Any size — will be resized to bead grid</p>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div>
+      <div class="section-label">02 — Grid Settings</div>
+      <div style="display:flex;flex-direction:column;gap:1rem;">
+        <div class="control-group">
+          <label>Grid width (beads) <span id="widthVal">48</span></label>
+          <input type="range" id="gridWidth" min="16" max="128" value="48" step="1">
+        </div>
+        <div class="control-group">
+          <label>Grid height (beads) <span id="heightVal">48</span></label>
+          <input type="range" id="gridHeight" min="16" max="128" value="48" step="1">
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">03 — Color Palette</div>
+      <div class="control-group">
+        <label>Palette</label>
+        <select id="paletteSelect">
+          <option value="perler">Perler Standard (22 colors)</option>
+          <option value="artkal">Artkal Mini (30 colors)</option>
+          <option value="reduced">Reduced (12 colors)</option>
+        </select>
+      </div>
+      <div class="control-group" style="margin-top:0.8rem;">
+        <label>Max colors in output <span id="maxColVal">12</span></label>
+        <input type="range" id="maxColors" min="4" max="30" value="12" step="1">
+      </div>
+      <div style="margin-top:0.8rem;">
+        <div class="section-label" style="margin-bottom:0.4rem;">Palette Preview</div>
+        <div class="palette-preview" id="palettePreview"></div>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div>
+      <div class="section-label">04 — PDF Settings</div>
+      <div style="display:flex;flex-direction:column;gap:0.8rem;">
+        <div class="control-group">
+          <label>Bead size on paper (mm) <span id="beadMmVal">8</span></label>
+          <input type="range" id="beadMm" min="4" max="15" value="8" step="0.5">
+        </div>
+        <div class="control-group">
+          <label>Page size</label>
+          <select id="pageSize">
+            <option value="letter">US Letter (8.5 × 11 in)</option>
+            <option value="a4">A4 (210 × 297 mm)</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Show grid lines in PDF</label>
+          <select id="showGrid">
+            <option value="yes">Yes — faint grid</option>
+            <option value="no">No grid</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Show row / col numbers</label>
+          <select id="showNumbers">
+            <option value="yes">Yes (every 5)</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div>
+      <div class="section-label">Stats</div>
+      <div class="stats" id="statsBox">
+        <div class="stat"><span>Grid size</span><span>—</span></div>
+        <div class="stat"><span>Total beads</span><span>—</span></div>
+        <div class="stat"><span>Colors used</span><span>—</span></div>
+        <div class="stat"><span>PDF pages</span><span>—</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="generateBtn" disabled>Generate</button>
+        <button class="btn btn-secondary" id="downloadBtn" disabled>⬇ PDF</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN AREA -->
+  <main class="main">
+    <div class="canvas-header">
+      <h2 id="canvasTitle">Upload an image to begin</h2>
+      <div class="zoom-controls">
+        <button class="zoom-btn" id="zoomOut">−</button>
+        <span class="zoom-level" id="zoomLabel">100%</span>
+        <button class="zoom-btn" id="zoomIn">+</button>
+        <button class="zoom-btn" id="zoomReset" title="Reset zoom">⌂</button>
+      </div>
+    </div>
+
+    <div class="bead-viewport" id="beadViewport">
+      <canvas id="beadCanvas"></canvas>
+      <div class="empty-state" id="emptyState">
+        <div class="big-icon">⬡</div>
+        <p>Your bead pattern will appear here</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label" style="margin-bottom:0.6rem;">Color Legend</div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Progress overlay -->
+<div class="progress-overlay" id="progressOverlay">
+  <div class="progress-box">
+    <div style="font-family:'Fraunces',serif;font-size:1.1rem;font-weight:300;font-style:italic;">Generating PDF…</div>
+    <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">Preparing…</div>
+  </div>
+</div>
+
+<!-- Hidden canvas for image processing -->
+<canvas id="offscreen" style="display:none;"></canvas>
+
+<script>
+// ─── PALETTES ──────────────────────────────────────────────────────────────
+const PALETTES = {
+  perler: [
+    {name:'White',      hex:'#FFFFFF'},{name:'Cream',      hex:'#FFF5DC'},
+    {name:'Yellow',     hex:'#FFD700'},{name:'Orange',     hex:'#FF7F00'},
+    {name:'Red',        hex:'#DD2020'},{name:'Magenta',    hex:'#CC0077'},
+    {name:'Purple',     hex:'#6B0AC9'},{name:'Navy',       hex:'#1B2A8A'},
+    {name:'Blue',       hex:'#2255CC'},{name:'Sky Blue',   hex:'#4BB8F0'},
+    {name:'Teal',       hex:'#008B8B'},{name:'Green',      hex:'#22AA44'},
+    {name:'Lt Green',   hex:'#88CC44'},{name:'Olive',      hex:'#808000'},
+    {name:'Brown',      hex:'#7B4010'},{name:'Tan',        hex:'#C8A070'},
+    {name:'Peach',      hex:'#FFBE9A'},{name:'Pink',       hex:'#FF85AA'},
+    {name:'Lt Gray',    hex:'#C0C0C0'},{name:'Gray',       hex:'#808080'},
+    {name:'Dk Gray',    hex:'#404040'},{name:'Black',      hex:'#111111'},
+  ],
+  artkal: [
+    {name:'White',      hex:'#FFFFFF'},{name:'Cream',      hex:'#FDF0C8'},
+    {name:'Lt Yellow',  hex:'#FFF176'},{name:'Yellow',     hex:'#FFD600'},
+    {name:'Amber',      hex:'#FFA000'},{name:'Orange',     hex:'#FF5722'},
+    {name:'Red',        hex:'#E53935'},{name:'Crimson',    hex:'#B71C1C'},
+    {name:'Pink',       hex:'#F48FB1'},{name:'Hot Pink',   hex:'#E91E63'},
+    {name:'Magenta',    hex:'#AD1457'},{name:'Purple',     hex:'#6A1B9A'},
+    {name:'Violet',     hex:'#4527A0'},{name:'Indigo',     hex:'#283593'},
+    {name:'Navy',       hex:'#1A237E'},{name:'Blue',       hex:'#1565C0'},
+    {name:'Lt Blue',    hex:'#42A5F5'},{name:'Cyan',       hex:'#00BCD4'},
+    {name:'Teal',       hex:'#00796B'},{name:'Green',      hex:'#2E7D32'},
+    {name:'Lt Green',   hex:'#8BC34A'},{name:'Lime',       hex:'#C6EF3F'},
+    {name:'Olive',      hex:'#827717'},{name:'Brown',      hex:'#6D4C41'},
+    {name:'Tan',        hex:'#BCAAA4'},{name:'Peach',      hex:'#FFAB91'},
+    {name:'Lt Gray',    hex:'#BDBDBD'},{name:'Gray',       hex:'#757575'},
+    {name:'Dk Gray',    hex:'#424242'},{name:'Black',      hex:'#212121'},
+  ],
+  reduced: [
+    {name:'White',  hex:'#FFFFFF'},{name:'Yellow', hex:'#FFD700'},
+    {name:'Orange', hex:'#FF7F00'},{name:'Red',    hex:'#DD2020'},
+    {name:'Pink',   hex:'#FF85AA'},{name:'Purple', hex:'#6B0AC9'},
+    {name:'Blue',   hex:'#2255CC'},{name:'Sky',    hex:'#4BB8F0'},
+    {name:'Green',  hex:'#22AA44'},{name:'Brown',  hex:'#7B4010'},
+    {name:'Gray',   hex:'#808080'},{name:'Black',  hex:'#111111'},
+  ]
+};
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let state = {
+  imageData: null,
+  beadGrid: null,   // 2D array of hex strings
+  usedColors: [],
+  zoom: 1,
+};
+
+// ─── ELEMENTS ──────────────────────────────────────────────────────────────
+const fileInput    = document.getElementById('fileInput');
+const uploadZone   = document.getElementById('uploadZone');
+const gridWidthEl  = document.getElementById('gridWidth');
+const gridHeightEl = document.getElementById('gridHeight');
+const widthVal     = document.getElementById('widthVal');
+const heightVal    = document.getElementById('heightVal');
+const maxColorsEl  = document.getElementById('maxColors');
+const maxColVal    = document.getElementById('maxColVal');
+const paletteSelect= document.getElementById('paletteSelect');
+const beadMmEl     = document.getElementById('beadMm');
+const beadMmVal    = document.getElementById('beadMmVal');
+const pageSizeEl   = document.getElementById('pageSize');
+const showGridEl   = document.getElementById('showGrid');
+const showNumEl    = document.getElementById('showNumbers');
+const generateBtn  = document.getElementById('generateBtn');
+const downloadBtn  = document.getElementById('downloadBtn');
+const beadCanvas   = document.getElementById('beadCanvas');
+const offscreen    = document.getElementById('offscreen');
+const emptyState   = document.getElementById('emptyState');
+const legend       = document.getElementById('legend');
+const statsBox     = document.getElementById('statsBox');
+const canvasTitle  = document.getElementById('canvasTitle');
+const toast        = document.getElementById('toast');
+const progressOverlay = document.getElementById('progressOverlay');
+const progressFill = document.getElementById('progressFill');
+const progressLabel= document.getElementById('progressLabel');
+
+// ─── UTILITIES ─────────────────────────────────────────────────────────────
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r,g,b];
+}
+
+function colorDist(r1,g1,b1,r2,g2,b2) {
+  // Weighted Euclidean in RGB (simple, fast)
+  const dr = r1-r2, dg = g1-g2, db = b1-b2;
+  return dr*dr + dg*dg + db*db;
+}
+
+function closestColor(r,g,b, palette) {
+  let best = 0, bestDist = Infinity;
+  for (let i=0; i<palette.length; i++) {
+    const [pr,pg,pb] = hexToRgb(palette[i].hex);
+    const d = colorDist(r,g,b,pr,pg,pb);
+    if (d < bestDist) { bestDist = d; best = i; }
+  }
+  return palette[best].hex;
+}
+
+function showToast(msg, duration=2200) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), duration);
+}
+
+function updateStats() {
+  if (!state.beadGrid) return;
+  const rows = state.beadGrid.length;
+  const cols = state.beadGrid[0].length;
+  const total = rows * cols;
+  const colors = state.usedColors.length;
+  
+  // Compute PDF pages
+  const beadMm = parseFloat(beadMmEl.value);
+  const pageW_mm = pageSizeEl.value === 'letter' ? 215.9 : 210;
+  const pageH_mm = pageSizeEl.value === 'letter' ? 279.4 : 297;
+  const margin = 15; // mm each side
+  const usableW = pageW_mm - margin*2;
+  const usableH = pageH_mm - margin*2;
+  const beadsPerPageX = Math.floor(usableW / beadMm);
+  const beadsPerPageY = Math.floor(usableH / beadMm);
+  const pagesX = Math.ceil(cols / beadsPerPageX);
+  const pagesY = Math.ceil(rows / beadsPerPageY);
+  const totalPages = pagesX * pagesY;
+
+  statsBox.innerHTML = `
+    <div class="stat"><span>Grid size</span><span>${cols} × ${rows}</span></div>
+    <div class="stat"><span>Total beads</span><span>${total.toLocaleString()}</span></div>
+    <div class="stat"><span>Colors used</span><span>${colors}</span></div>
+    <div class="stat"><span>PDF pages</span><span>${totalPages} (${pagesX}×${pagesY})</span></div>
+  `;
+}
+
+// ─── PALETTE PREVIEW ───────────────────────────────────────────────────────
+function renderPalettePreview() {
+  const palette = PALETTES[paletteSelect.value];
+  const preview = document.getElementById('palettePreview');
+  preview.innerHTML = '';
+  palette.forEach(c => {
+    const sw = document.createElement('div');
+    sw.className = 'palette-swatch';
+    sw.style.background = c.hex;
+    sw.title = c.name;
+    preview.appendChild(sw);
+  });
+}
+
+paletteSelect.addEventListener('change', renderPalettePreview);
+renderPalettePreview();
+
+// ─── RANGE DISPLAY ─────────────────────────────────────────────────────────
+gridWidthEl.addEventListener('input',  () => widthVal.textContent  = gridWidthEl.value);
+gridHeightEl.addEventListener('input', () => heightVal.textContent = gridHeightEl.value);
+maxColorsEl.addEventListener('input',  () => maxColVal.textContent = maxColorsEl.value);
+beadMmEl.addEventListener('input', () => { beadMmVal.textContent = beadMmEl.value; updateStats(); });
+pageSizeEl.addEventListener('change', updateStats);
+
+// ─── FILE UPLOAD ───────────────────────────────────────────────────────────
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && (file.type === 'image/jpeg' || file.type === 'image/png')) loadFile(file);
+  else showToast('Please drop a JPG or PNG file');
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) loadFile(fileInput.files[0]);
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      state.imageData = img;
+      generateBtn.disabled = false;
+      canvasTitle.textContent = `Ready — ${file.name} (${img.width}×${img.height}px)`;
+      showToast(`Image loaded: ${img.width}×${img.height}px`);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─── GENERATE PATTERN ──────────────────────────────────────────────────────
+generateBtn.addEventListener('click', generatePattern);
+
+function getActivePalette() {
+  const full = PALETTES[paletteSelect.value];
+  const maxC = parseInt(maxColorsEl.value);
+  // Return capped palette
+  return full.slice(0, Math.min(maxC, full.length));
+}
+
+function generatePattern() {
+  if (!state.imageData) return;
+
+  const cols = parseInt(gridWidthEl.value);
+  const rows = parseInt(gridHeightEl.value);
+  const palette = getActivePalette();
+
+  // Draw image to offscreen canvas at bead grid size
+  offscreen.width  = cols;
+  offscreen.height = rows;
+  const ctx = offscreen.getContext('2d');
+  ctx.drawImage(state.imageData, 0, 0, cols, rows);
+  const imgData = ctx.getImageData(0, 0, cols, rows).data;
+
+  // Build bead grid
+  const grid = [];
+  for (let y = 0; y < rows; y++) {
+    grid[y] = [];
+    for (let x = 0; x < cols; x++) {
+      const i = (y * cols + x) * 4;
+      const r = imgData[i], g = imgData[i+1], b = imgData[i+2];
+      grid[y][x] = closestColor(r, g, b, palette);
+    }
+  }
+
+  state.beadGrid = grid;
+
+  // Count used colors
+  const colorSet = new Set();
+  grid.forEach(row => row.forEach(c => colorSet.add(c)));
+  state.usedColors = [...colorSet];
+
+  renderBeadCanvas();
+  renderLegend();
+  updateStats();
+  downloadBtn.disabled = false;
+  emptyState.style.display = 'none';
+  showToast(`Pattern generated! ${cols}×${rows} beads, ${state.usedColors.length} colors`);
+}
+
+// ─── RENDER BEAD CANVAS ────────────────────────────────────────────────────
+const BEAD_PX = 14; // pixels per bead at zoom=1
+
+function renderBeadCanvas() {
+  if (!state.beadGrid) return;
+  const rows = state.beadGrid.length;
+  const cols = state.beadGrid[0].length;
+  const sz = Math.round(BEAD_PX * state.zoom);
+
+  beadCanvas.width  = cols * sz;
+  beadCanvas.height = rows * sz;
+
+  const ctx = beadCanvas.getContext('2d');
+  ctx.clearRect(0, 0, beadCanvas.width, beadCanvas.height);
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const color = state.beadGrid[y][x];
+      const px = x * sz, py = y * sz;
+
+      // Draw bead as circle
+      ctx.beginPath();
+      ctx.arc(px + sz/2, py + sz/2, sz/2 - 1, 0, Math.PI*2);
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      // Subtle inner highlight
+      if (sz >= 8) {
+        const grad = ctx.createRadialGradient(
+          px + sz*0.35, py + sz*0.35, sz*0.05,
+          px + sz/2, py + sz/2, sz*0.5
+        );
+        grad.addColorStop(0, 'rgba(255,255,255,0.25)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.12)');
+        ctx.beginPath();
+        ctx.arc(px + sz/2, py + sz/2, sz/2 - 1, 0, Math.PI*2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      // Grid dot
+      if (sz >= 5) {
+        ctx.beginPath();
+        ctx.arc(px + sz/2, py + sz/2, Math.max(1, sz*0.06), 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.fill();
+      }
+    }
+  }
+}
+
+// ─── ZOOM ──────────────────────────────────────────────────────────────────
+document.getElementById('zoomIn').addEventListener('click', () => {
+  state.zoom = Math.min(4, parseFloat((state.zoom + 0.25).toFixed(2)));
+  updateZoom();
+});
+
+document.getElementById('zoomOut').addEventListener('click', () => {
+  state.zoom = Math.max(0.25, parseFloat((state.zoom - 0.25).toFixed(2)));
+  updateZoom();
+});
+
+document.getElementById('zoomReset').addEventListener('click', () => {
+  state.zoom = 1;
+  updateZoom();
+});
+
+function updateZoom() {
+  document.getElementById('zoomLabel').textContent = Math.round(state.zoom * 100) + '%';
+  if (state.beadGrid) renderBeadCanvas();
+}
+
+// ─── LEGEND ────────────────────────────────────────────────────────────────
+function renderLegend() {
+  legend.innerHTML = '';
+  const palette = getActivePalette();
+  const palMap = {};
+  palette.forEach(c => palMap[c.hex.toUpperCase()] = c.name);
+
+  state.usedColors.forEach(hex => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    const dot = document.createElement('div');
+    dot.className = 'legend-dot';
+    dot.style.background = hex;
+    item.appendChild(dot);
+    const lbl = document.createElement('span');
+    lbl.textContent = palMap[hex.toUpperCase()] || hex;
+    item.appendChild(lbl);
+    legend.appendChild(item);
+  });
+}
+
+// ─── PDF GENERATION ────────────────────────────────────────────────────────
+downloadBtn.addEventListener('click', generatePDF);
+
+async function generatePDF() {
+  if (!state.beadGrid) return;
+
+  const { jsPDF } = window.jspdf;
+  const beadMm = parseFloat(beadMmEl.value);
+  const isLetter = pageSizeEl.value === 'letter';
+  const pageW_mm = isLetter ? 215.9 : 210;
+  const pageH_mm = isLetter ? 279.4 : 297;
+  const margin = 15; // mm
+  const drawGrid = showGridEl.value === 'yes';
+  const drawNums = showNumEl.value === 'yes';
+  const numOffset = drawNums ? 8 : 0; // mm for number labels
+
+  const usableW = pageW_mm - margin*2 - numOffset;
+  const usableH = pageH_mm - margin*2 - numOffset;
+  const beadsPerPageX = Math.floor(usableW / beadMm);
+  const beadsPerPageY = Math.floor(usableH / beadMm);
+
+  const rows = state.beadGrid.length;
+  const cols = state.beadGrid[0].length;
+  const pagesX = Math.ceil(cols / beadsPerPageX);
+  const pagesY = Math.ceil(rows / beadsPerPageY);
+  const totalTiles = pagesX * pagesY;
+
+  // Show progress
+  progressOverlay.classList.add('show');
+  progressFill.style.width = '0%';
+  progressLabel.textContent = 'Setting up PDF…';
+
+  // Use setTimeout to allow UI to update
+  await new Promise(r => setTimeout(r, 50));
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: isLetter ? 'letter' : 'a4',
+    compress: true
+  });
+
+  // Get palette name map
+  const palette = getActivePalette();
+  const palMap = {};
+  palette.forEach(c => palMap[c.hex.toUpperCase()] = c.name);
+
+  let pageIndex = 0;
+  let firstPage = true;
+
+  for (let py = 0; py < pagesY; py++) {
+    for (let px = 0; px < pagesX; px++) {
+      if (!firstPage) doc.addPage();
+      firstPage = false;
+
+      const startCol = px * beadsPerPageX;
+      const startRow = py * beadsPerPageY;
+      const endCol = Math.min(startCol + beadsPerPageX, cols);
+      const endRow = Math.min(startRow + beadsPerPageY, rows);
+
+      const xOff = margin + numOffset;
+      const yOff = margin + numOffset;
+
+      // Page header info
+      doc.setFontSize(6);
+      doc.setTextColor(150,150,150);
+      doc.text(
+        `Perler Bead Pattern  |  Section ${px+1},${py+1} of ${pagesX}×${pagesY}  |  Cols ${startCol+1}–${endCol}, Rows ${startRow+1}–${endRow}  |  Print at 100% — no resizing`,
+        margin, margin - 4
+      );
+
+      // Draw row numbers
+      if (drawNums) {
+        doc.setFontSize(5);
+        doc.setTextColor(120,120,120);
+        for (let r = startRow; r < endRow; r++) {
+          if ((r % 5 === 0) || r === startRow) {
+            const y = yOff + (r - startRow) * beadMm + beadMm/2 + 1;
+            doc.text(String(r+1), margin + numOffset - 2, y, {align:'right'});
+          }
+        }
+        for (let c = startCol; c < endCol; c++) {
+          if ((c % 5 === 0) || c === startCol) {
+            const x = xOff + (c - startCol) * beadMm + beadMm/2;
+            doc.text(String(c+1), x, margin + numOffset - 2, {align:'center'});
+          }
+        }
+      }
+
+      // Draw beads
+      for (let r = startRow; r < endRow; r++) {
+        for (let c = startCol; c < endCol; c++) {
+          const hex = state.beadGrid[r][c];
+          const [rr,gg,bb] = hexToRgb(hex);
+          const bx = xOff + (c - startCol) * beadMm;
+          const by = yOff + (r - startRow) * beadMm;
+          const cx = bx + beadMm/2;
+          const cy = by + beadMm/2;
+          const rad = beadMm/2 * 0.82;
+
+          // Fill circle
+          doc.setFillColor(rr,gg,bb);
+          doc.circle(cx, cy, rad, 'F');
+
+          // Subtle outline
+          const dr = Math.max(0,rr-40), dg = Math.max(0,gg-40), db = Math.max(0,bb-40);
+          doc.setDrawColor(dr,dg,db);
+          doc.setLineWidth(0.08);
+          doc.circle(cx, cy, rad, 'S');
+
+          // Center hole dot
+          doc.setFillColor(Math.max(0,rr-60),Math.max(0,gg-60),Math.max(0,bb-60));
+          doc.circle(cx, cy, beadMm*0.06, 'F');
+        }
+      }
+
+      // Grid lines
+      if (drawGrid) {
+        doc.setDrawColor(180,180,180);
+        doc.setLineWidth(0.05);
+        const gridW = (endCol - startCol) * beadMm;
+        const gridH = (endRow - startRow) * beadMm;
+        for (let c = 0; c <= endCol - startCol; c++) {
+          const x = xOff + c * beadMm;
+          doc.line(x, yOff, x, yOff + gridH);
+        }
+        for (let r = 0; r <= endRow - startRow; r++) {
+          const y = yOff + r * beadMm;
+          doc.line(xOff, y, xOff + gridW, y);
+        }
+      }
+
+      pageIndex++;
+      const pct = Math.round((pageIndex / totalTiles) * 85);
+      progressFill.style.width = pct + '%';
+      progressLabel.textContent = `Page ${pageIndex} of ${totalTiles}…`;
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  // ── LEGEND PAGE ──
+  doc.addPage();
+  doc.setFontSize(14);
+  doc.setTextColor(30,30,30);
+  doc.setFont(undefined, 'bold');
+  doc.text('Color Legend', margin, margin + 6);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(100,100,100);
+  doc.text('Use these colors to select your Perler beads', margin, margin + 12);
+
+  doc.setFontSize(7);
+  let lx = margin, ly = margin + 22;
+  const swSz = 7, gap = 2, colW = 55, rowH = 10;
+
+  state.usedColors.forEach((hex, i) => {
+    const [rr,gg,bb] = hexToRgb(hex);
+    const name = palMap[hex.toUpperCase()] || hex;
+
+    // Count beads of this color
+    let count = 0;
+    state.beadGrid.forEach(row => row.forEach(c => { if (c === hex) count++; }));
+
+    // Swatch circle
+    doc.setFillColor(rr,gg,bb);
+    doc.circle(lx + swSz/2, ly + swSz/2 - 1, swSz/2, 'F');
+    const dr = Math.max(0,rr-50),dg = Math.max(0,gg-50),db = Math.max(0,bb-50);
+    doc.setDrawColor(dr,dg,db);
+    doc.setLineWidth(0.1);
+    doc.circle(lx + swSz/2, ly + swSz/2 - 1, swSz/2, 'S');
+
+    // Text
+    doc.setTextColor(30,30,30);
+    doc.setFontSize(7);
+    doc.text(name, lx + swSz + 2, ly + 2);
+    doc.setTextColor(120,120,120);
+    doc.setFontSize(6);
+    doc.text(`${count.toLocaleString()} beads`, lx + swSz + 2, ly + 6);
+
+    lx += colW;
+    if (lx + colW > pageW_mm - margin) {
+      lx = margin;
+      ly += rowH;
+      if (ly > pageH_mm - margin - 15) {
+        doc.addPage();
+        ly = margin + 8;
+        lx = margin;
+      }
+    }
+  });
+
+  // Finalise
+  progressFill.style.width = '100%';
+  progressLabel.textContent = 'Saving…';
+  await new Promise(r => setTimeout(r, 100));
+
+  doc.save('perler-bead-pattern.pdf');
+
+  progressOverlay.classList.remove('show');
+  showToast('PDF downloaded! Print at 100% — no scaling.', 3500);
+}
+
+// ─── SERVICE WORKER REGISTRATION ───────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log('PWA: Service worker registered'))
+      .catch(err => console.log('PWA: SW registration failed:', err));
+  });
+}
+
+// ─── INSTALL PROMPT ────────────────────────────────────────────────────────
+let deferredInstallPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.style.display = 'flex';
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('installBtn');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') btn.style.display = 'none';
+      deferredInstallPrompt = null;
+    });
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBtn').style.display = 'none';
+  showToast('✓ App installed! Open it from your home screen anytime.');
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="38" fill="#0e0e0e"/>
+  <!-- Hexagonal bead grid pattern -->
+  <!-- Row 1 -->
+  <circle cx="56" cy="64" r="18" fill="#e8c547"/>
+  <circle cx="96" cy="64" r="18" fill="#c96b3f"/>
+  <circle cx="136" cy="64" r="18" fill="#4BB8F0"/>
+  <!-- Row 2 (offset) -->
+  <circle cx="36" cy="98" r="18" fill="#22AA44"/>
+  <circle cx="76" cy="98" r="18" fill="#DD2020"/>
+  <circle cx="116" cy="98" r="18" fill="#e8c547"/>
+  <circle cx="156" cy="98" r="18" fill="#6B0AC9"/>
+  <!-- Row 3 -->
+  <circle cx="56" cy="132" r="18" fill="#4BB8F0"/>
+  <circle cx="96" cy="132" r="18" fill="#22AA44"/>
+  <circle cx="136" cy="132" r="18" fill="#c96b3f"/>
+  <!-- Center holes -->
+  <circle cx="56" cy="64" r="4" fill="rgba(0,0,0,0.3)"/>
+  <circle cx="96" cy="64" r="4" fill="rgba(0,0,0,0.3)"/>
+  <circle cx="136" cy="64" r="4" fill="rgba(0,0,0,0.3)"/>
+  <circle cx="36" cy="98" r="4" fill="rgba(0,0,0,0.3)"/>
+  <circle cx="76" cy="98" r="4" fill="rgba(0,0,0,0.3)"/>
+  <circle cx="116" cy="98" r="4" fill="rgba(0,0,0,0.3)"/>
+  <circle cx="156" cy="98" r="4" fill="rgba(0,0,0,0.3)"/>
+  <circle cx="56" cy="132" r="4" fill="rgba(0,0,0,0.3)"/>
+  <circle cx="96" cy="132" r="4" fill="rgba(0,0,0,0.3)"/>
+  <circle cx="136" cy="132" r="4" fill="rgba(0,0,0,0.3)"/>
+</svg>
